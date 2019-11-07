@@ -139,14 +139,14 @@ if __name__ == "__main__":
     n_file = len(file_names)
     social_instance = SocialFeaturesUtils()
     
-#    start = time.time()
-#    
-#    Parallel(n_jobs=-2)(delayed(load_compute_save)(i,file_names,social_instance) 
-#    for i in range(0, n_file, batch_size))
-#    
-#    merge_all_features()
-#    end = time.time()
-#    print(end-start)
+   start = time.time()
+   
+   Parallel(n_jobs=-2)(delayed(load_compute_save)(i,file_names,social_instance) 
+   for i in range(0, n_file, batch_size))
+   
+   merge_all_features()
+   end = time.time()
+   print(end-start)
     
 
 #    df = pd.read_pickle('../forecasting_sample/all_feature/features_'+mode+'.pkl')
