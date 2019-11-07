@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pickle as pkl
 import sys
+import copy
 
 from typing import Dict
 from argoverse.map_representation.map_api import ArgoverseMap
@@ -22,11 +23,11 @@ obs_len = 20
 pred_len = 30
 
 # following must be changed according to situation !!!!!!!!!
-data_dir = "../forecasting_sample/data100"
+data_dir = "../forecasting_sample/data"
 batch_feature_dir = "../forecasting_sample/feature"
 feature_dir = "../forecasting_sample/all_feature"
 
-batch_size = 10
+batch_size = 5
 
 mode = "train"
 ###################
@@ -67,12 +68,16 @@ def compute_map_features(
     oracle_nt_dist = get_nt_distance(xy,
                                      oracle_centerline,
                                      viz=False)
+    delta_ref = copy.deepcopy(oracle_nt_dist[0,:])
+    for i in range(xy.shape[0]-1,0,-1):
+        oracle_nt_dist[i,:] = oracle_nt_dist[i,:]-oracle_nt_dist[i-1,:]
+    oracle_nt_dist[0,:] = 0
     
     if mode=="test":
         oracle_nt_dist = np.concatenate(
                 (oracle_nt_dist, np.full([pred_len,2], None)), axis=0)
 
-    return oracle_nt_dist, oracle_centerline
+    return oracle_nt_dist, oracle_centerline, delta_ref
 
 def load_compute_save (idx, file_names, social_instance):
     data = []
@@ -83,7 +88,7 @@ def load_compute_save (idx, file_names, social_instance):
         df = pd.read_csv(file_path, dtype={"TIMESTAMP": str})
         agent_track = df[df["OBJECT_TYPE"] == "AGENT"].values
         
-        map_features, oracle_centerline = compute_map_features(
+        map_features, oracle_centerline, delta_ref = compute_map_features(
             agent_track,
             obs_len,
             pred_len,
@@ -103,13 +108,14 @@ def load_compute_save (idx, file_names, social_instance):
         
         name_id = int(name.split(".")[0])
 
-        data.append([name_id, features, oracle_centerline])
+        data.append([name_id, features, oracle_centerline, delta_ref])
         
     data_df = pd.DataFrame(data, 
     columns=[
         "ID",
         "FEATURES",
-        "ORACLE_CENTERLINES"
+        "ORACLE_CENTERLINES",
+        "DELTA_REFERENCE"
         ]
     )
     data_df.to_pickle(f"{batch_feature_dir}/{mode}_{idx}_{idx+batch_size-1}.pkl")
@@ -139,14 +145,14 @@ if __name__ == "__main__":
     n_file = len(file_names)
     social_instance = SocialFeaturesUtils()
     
-   start = time.time()
-   
-   Parallel(n_jobs=-2)(delayed(load_compute_save)(i,file_names,social_instance) 
-   for i in range(0, n_file, batch_size))
-   
-   merge_all_features()
-   end = time.time()
-   print(end-start)
+    start = time.time()
+    
+    Parallel(n_jobs=-2)(delayed(load_compute_save)(i,file_names,social_instance) 
+    for i in range(0, n_file, batch_size))
+    
+    merge_all_features()
+    end = time.time()
+    print(end-start)
     
 
 #    df = pd.read_pickle('../forecasting_sample/all_feature/features_'+mode+'.pkl')
@@ -158,7 +164,7 @@ if __name__ == "__main__":
 #    df = pd.read_csv(file_path, dtype={"TIMESTAMP": str})
 #    agent_track = df[df["OBJECT_TYPE"] == "AGENT"].values
 #    
-#    map_features, oracle_centerline = compute_map_features(
+#    map_features, oracle_centerline, delta_ref = compute_map_features(
 #        agent_track,
 #        obs_len,
 #        pred_len,
